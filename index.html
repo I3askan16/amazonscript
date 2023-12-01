@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" type="text/css" href="style.css">
+  <title>Amazon Ürün Finder</title>
+</head>
+<body>
+  <h1>Amazon Ürün Finder</h1>
+
+  <label for="searchKeyword">Arama Kelimesi:</label>
+  <input type="text" id="searchKeyword" placeholder="Ürün adı">
+
+  <button onclick="searchAmazon()">Ara</button>
+
+  <h2>Amazon Sonuçları</h2>
+  <table id="results">
+    <thead>
+      <tr>
+        <th>Ürün Adı</th>
+        <th>ASIN</th>
+        <th>Amerika Fiyatı</th>
+        <th>Kanada Fiyatı</th>
+        <th>Detayları Göster</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <!-- Detayları Göstermek İçin Modal -->
+  <div id="detailsModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeDetailsModal()">&times;</span>
+      <div id="detailsContent"></div>
+    </div>
+  </div>
+
+  <script>
+    async function searchAmazon() {
+      const searchKeyword = document.getElementById('searchKeyword').value;
+
+      const response = await fetch('/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ searchKeyword }),
+      });
+
+      const data = await response.json();
+      const resultsTable = document.getElementById('results').getElementsByTagName('tbody')[0];
+
+      resultsTable.innerHTML = ''; // Temizle
+
+      if (data.results && data.results.length > 0) {
+        data.results.forEach(result => {
+          const row = resultsTable.insertRow();
+
+          const nameCell = row.insertCell(0);
+          nameCell.textContent = result.name;
+
+          const asinCell = row.insertCell(1);
+          asinCell.textContent = result.asin;
+
+          const priceUSCell = row.insertCell(2);
+          priceUSCell.textContent = result.priceUS;
+
+          const priceCanadaCell = row.insertCell(3);
+          priceCanadaCell.textContent = result.priceCanada;
+
+          const detailsCell = row.insertCell(4);
+          detailsCell.innerHTML = `<button onclick="showProductDetails('${result.asin}')">Detayları Göster</button>`;
+        });
+      } else {
+        const row = resultsTable.insertRow();
+        const cell = row.insertCell(0);
+        cell.colSpan = 5;
+        cell.textContent = 'Ürün Bulunamadı';
+      }
+    }
+
+    async function showProductDetails(asin) {
+  const response = await fetch(`/product-details?asin=${asin}`);
+  const details = await response.json();
+
+  // "Customer Reviews" alanının var olup olmadığını kontrol et
+  if (details && details['Customer Reviews']) {
+    // Customer Reviews içinden yıldızları ve değerlendirmeleri çek
+    const customerReviews = extractCustomerReviews(details['Customer Reviews']);
+
+    // Modal içeriğini güncelle
+    const detailsContent = document.getElementById('detailsContent');
+    detailsContent.innerHTML = formatDetails(details) + customerReviews;
+
+    // Modal'ı göster
+    const detailsModal = document.getElementById('detailsModal');
+    detailsModal.style.display = 'block';
+  } else {
+    console.error('Ürün detaylarında "Customer Reviews" bulunamadı.');
+  }
+}
+    function extractCustomerReviews(customerReviews) {
+      const regex = /(\d+\.\d+)\s+out\s+of\s+5\s+stars\s+(\d+(\,\d+)?)\s+ratings/i;
+      const match = customerReviews.match(regex);
+
+      if (match) {
+        const stars = match[1];
+        const ratings = match[2];
+        return `<p><strong>Stars:</strong> ${stars}</p><p><strong>Ratings:</strong> ${ratings}</p>`;
+      } else {
+        return '<p>Yorum bulunamadı</p>';
+      }
+    }
+
+    function closeDetailsModal() {
+      // Modal'ı kapat
+      const detailsModal = document.getElementById('detailsModal');
+      detailsModal.style.display = 'none';
+    }
+
+    function formatDetails(details) {
+      // Detayları uygun bir formatta düzenle
+      let formattedDetails = '<h3>Ürün Detayları</h3>';
+      for (const [label, value] of Object.entries(details)) {
+        formattedDetails += `<p><strong>${label}:</strong> ${value}</p>`;
+      }
+      return formattedDetails;
+    }
+  </script>
+</body>
+</html>
